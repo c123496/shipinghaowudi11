@@ -56,6 +56,13 @@ interface RiskWarning {
   suggestion: string;
 }
 
+interface ImagePrompt {
+  scene: string;
+  cn: string;
+  en: string;
+  style: string;
+}
+
 interface HumanizeResult {
   contentType?: string;
   aiScoreBefore?: number;
@@ -80,6 +87,7 @@ interface HumanizeResult {
   shotSuggestions?: ShotSuggestion[];
   riskWarnings?: RiskWarning[];
   nextOptimizationTips?: string[];
+  imagePrompts?: ImagePrompt[];
   rawText?: string;
   parseFailed?: boolean;
   error?: string;
@@ -892,6 +900,29 @@ export default function HumanizePage() {
                     <div key={i} className="p-2.5 bg-background rounded-lg text-sm">
                       <p className="text-foreground">{s.scene}</p>
                       <p className="text-xs text-muted mt-1">画面：{s.visual} · 情绪：{s.emotion}</p>
+                    </div>
+                  ))}
+                </div>
+              </Card>
+            )}
+
+            {/* Image Prompts */}
+            {result.imagePrompts && result.imagePrompts.length > 0 && (
+              <Card title="配图提示词" action={<span className="text-xs text-muted">可直接粘贴至 Midjourney / DALL·E / SD</span>}>
+                <div className="space-y-3">
+                  {result.imagePrompts.map((p, i) => (
+                    <div key={i} className="p-3 bg-background rounded-lg border border-border">
+                      <div className="flex items-center justify-between mb-1.5">
+                        <span className="text-xs font-medium text-primary">{p.scene}</span>
+                        <span className="text-xs text-muted border border-border rounded px-1.5 py-0.5">{p.style}</span>
+                      </div>
+                      <p className="text-xs text-muted mb-2">{p.cn}</p>
+                      <div className="flex items-start gap-2">
+                        <p className={`flex-1 text-xs font-mono leading-5 rounded px-2 py-1.5 break-all min-h-[2.5rem] ${p.en ? 'text-foreground bg-surface' : 'text-muted bg-surface italic'}`}>
+                          {p.en || '英文提示词未生成，请重新生成'}
+                        </p>
+                        {p.en && <CopyBtn text={p.en} />}
+                      </div>
                     </div>
                   ))}
                 </div>

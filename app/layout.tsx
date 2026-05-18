@@ -8,6 +8,7 @@ export const metadata: Metadata = {
 };
 
 const navItems = [
+  { href: "/quickgen", label: "一键成稿" },
   { href: "/", label: "控制台" },
   { href: "/library", label: "文案库" },
   { href: "/analyze", label: "风格分析" },
@@ -22,7 +23,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="zh-CN" className="h-full antialiased">
-      <body className="min-h-full flex flex-col">
+      <body className="min-h-full flex flex-col" suppressHydrationWarning>
         <nav className="sticky top-0 z-50 bg-surface/80 backdrop-blur-md border-b border-border">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="flex items-center justify-between h-14">
