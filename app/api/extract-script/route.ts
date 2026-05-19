@@ -24,7 +24,7 @@ function extractUrl(input: string): string {
 /** 判断平台 */
 function detectPlatform(url: string): 'douyin' | 'weixin' | 'unknown' {
   if (/douyin\.com|v\.douyin\.com|iesdouyin\.com/i.test(url)) return 'douyin';
-  if (/weixin\.qq\.com|channels\.weixin\.qq\.com/i.test(url)) return 'weixin';
+  if (/weixin\.qq\.com|channels\.weixin\.qq\.com|finder\.video\.qq\.com|weixin\.qq\.com\/sph\//i.test(url)) return 'weixin';
   return 'unknown';
 }
 
