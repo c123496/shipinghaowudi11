@@ -39,3 +39,7 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+cookies/douyin.txt
+
+# claude code worktrees（内部工作目录，不入库）
+.claude/worktrees/
