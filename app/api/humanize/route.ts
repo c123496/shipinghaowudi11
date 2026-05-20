@@ -246,6 +246,14 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    // Clean up spokenVersion — remove double newlines so paragraphs are single-line-break separated
+    if (parsed.mainScript) {
+      const ms = parsed.mainScript as Record<string, unknown>;
+      if (typeof ms.spokenVersion === 'string') {
+        ms.spokenVersion = ms.spokenVersion.replace(/\n{2,}/g, '\n').trim();
+      }
+    }
+
     // Post-check compliance on generated content
     if (currentMode === 'humanize' && parsed.mainScript) {
       const mainScript = parsed.mainScript as Record<string, unknown>;
