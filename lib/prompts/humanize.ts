@@ -329,10 +329,10 @@ ${bannedSection}
   ],
   "nextOptimizationTips": ["下一步优化建议1", "下一步优化建议2"],
   "imagePrompts": [
-    {"scene": "对应口播稿具体段落的一句话描述", "cn": "中文场景描述，纯环境/物件，无人物", "en": "scene-specific English prompt, no people, no human figures, no text, no words, no labels, no watermarks", "style": "风格标签"},
-    {"scene": "...", "cn": "...", "en": "...", "style": "..."},
-    {"scene": "...", "cn": "...", "en": "...", "style": "..."},
-    {"scene": "...", "cn": "...", "en": "...", "style": "..."}
+    {"scene": "第1个场景：对应口播稿开头段落的具体情节描述", "cn": "第1张中文场景描述，纯环境/物件/光影，绝对无人物", "en": "FULL English prompt for scene 1, minimum 40 words, specific to script content, no people, no human figures, no text, no words, no labels, no watermarks", "style": "与文案年代情绪匹配的风格标签"},
+    {"scene": "第2个场景：对应口播稿中段某个具体情节描述", "cn": "第2张中文场景描述，纯环境/物件/光影，绝对无人物", "en": "FULL English prompt for scene 2, minimum 40 words, specific to script content, no people, no human figures, no text, no words, no labels, no watermarks", "style": "与文案年代情绪匹配的风格标签"},
+    {"scene": "第3个场景：对应口播稿另一个具体情节描述", "cn": "第3张中文场景描述，纯环境/物件/光影，绝对无人物", "en": "FULL English prompt for scene 3, minimum 40 words, specific to script content, no people, no human figures, no text, no words, no labels, no watermarks", "style": "与文案年代情绪匹配的风格标签"},
+    {"scene": "第4个场景：对应口播稿结尾段落的具体情节描述", "cn": "第4张中文场景描述，纯环境/物件/光影，绝对无人物", "en": "FULL English prompt for scene 4, minimum 40 words, specific to script content, no people, no human figures, no text, no words, no labels, no watermarks", "style": "与文案年代情绪匹配的风格标签"}
   ]
 }
 
@@ -340,11 +340,13 @@ dimensionScores 各项 0-100，越高越好（repeatRisk 除外，越低越好�
 aiScoreBefore 和 aiScoreAfterEstimate 都是 0-100，越高表示AI味越重。
 riskWarnings 里只放真正有风险的，没风险就给空数组。
 
-imagePrompts 字段规则（必须遵守）：
-- 共4张，每张对应口播稿里一个具体情节或场景，scene 字段说明是哪一段
+imagePrompts 字段规则（必须严格遵守，4条缺一不可）：
+- 必须输出完整的4条，每条都要有真实内容，不能留 "..." 占位符，不能只填第1条
+- 4条分别对应口播稿的：开头场景、中段场景1、中段场景2、结尾场景，从稿件中提取具体情节
+- scene 字段：说明对应稿件哪一段的哪个具体情节，一句话描述
 - cn 字段：中文描述，只写环境、物件、光影，绝对不出现任何人物
-- en 字段：完整英文 prompt，直接描述画面，不少于40词，结尾必须加 no people, no human figures, no text, no words, no labels, no watermarks
-- style 字段：与文案年代/情绪匹配，如 vintage film photography、1930s documentary、still life photography
+- en 字段：完整英文 prompt，必须不少于40词，结尾必须加 no people, no human figures, no text, no words, no labels, no watermarks
+- style 字段：与文案年代/情绪匹配，如 vintage film photography、1930s documentary、still life photography、warm cinematic still
 - 如文案涉及民国/1930s，en 要体现 "1930s China, Republic of China era"
 - 如文案提到具体地点，en 要描述对应建筑风格或环境特征
 
