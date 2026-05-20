@@ -198,6 +198,16 @@ export async function POST(req: NextRequest) {
       cleaned = mdMatch[1].trim();
     }
 
+    // Step 1b: Fix unescaped newlines inside JSON string values
+    // AI often outputs literal newlines inside strings which breaks JSON.parse
+    cleaned = cleaned.replace(/"((?:[^"\\]|\\.)*)"/g, (_match, inner) => {
+      const fixed = inner
+        .replace(/\r\n/g, '\\n')
+        .replace(/\r/g, '\\n')
+        .replace(/\n/g, '\\n');
+      return `"${fixed}"`;
+    });
+
     try {
       parsed = JSON.parse(cleaned);
     } catch {
