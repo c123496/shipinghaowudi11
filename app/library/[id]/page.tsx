@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useState, useEffect, useCallback } from 'react';
+import { useParams } from 'next/navigation';
 import Link from 'next/link';
 
 interface Script {
@@ -29,7 +29,6 @@ interface Analysis {
 
 export default function ScriptDetailPage() {
   const params = useParams();
-  const router = useRouter();
   const id = params.id as string;
 
   const [script, setScript] = useState<Script | null>(null);
@@ -37,25 +36,28 @@ export default function ScriptDetailPage() {
   const [analyzing, setAnalyzing] = useState(false);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    fetchScript();
-    checkAnalysis();
-  }, [id]);
-
-  async function fetchScript() {
+  const fetchScript = useCallback(async () => {
     const res = await fetch(`/api/scripts`);
     const data: Script[] = await res.json();
     const found = data.find(s => s.id === id);
     setScript(found || null);
     setLoading(false);
-  }
+  }, [id]);
 
-  async function checkAnalysis() {
+  const checkAnalysis = useCallback(async () => {
     const res = await fetch(`/api/analyze`);
     const data = await res.json();
     const found = data.analyses?.find((a: Analysis) => a.scriptId === id);
     if (found) setAnalysis(found);
-  }
+  }, [id]);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      void fetchScript();
+      void checkAnalysis();
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [fetchScript, checkAnalysis]);
 
   async function runAnalysis() {
     if (!script) return;

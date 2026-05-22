@@ -10,6 +10,7 @@ export const metadata: Metadata = {
 const navItems = [
   { href: "/quickgen", label: "一键成稿" },
   { href: "/", label: "控制台" },
+  { href: "/scraper", label: "爆款监控" },
   { href: "/library", label: "文案库" },
   { href: "/analyze", label: "风格分析" },
   { href: "/generate", label: "文案生成" },

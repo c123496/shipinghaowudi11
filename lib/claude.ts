@@ -8,11 +8,25 @@ const client = new OpenAI({
 const DEFAULT_MODEL = process.env.DEEPSEEK_MODEL || 'deepseek-chat';
 const DEFAULT_TIMEOUT = parseInt(process.env.DEEPSEEK_TIMEOUT_MS || '120000', 10);
 
+export interface AIResponseMeta {
+  content: string;
+  finishReason: string | null;
+}
+
 export async function callAI(
   systemPrompt: string,
   userPrompt: string,
   options?: { maxTokens?: number; timeout?: number }
 ): Promise<string> {
+  const result = await callAIWithMeta(systemPrompt, userPrompt, options);
+  return result.content;
+}
+
+export async function callAIWithMeta(
+  systemPrompt: string,
+  userPrompt: string,
+  options?: { maxTokens?: number; timeout?: number }
+): Promise<AIResponseMeta> {
   const maxTokens = options?.maxTokens || 8192;
   const timeout = options?.timeout || DEFAULT_TIMEOUT;
 
@@ -31,7 +45,11 @@ export async function callAI(
       },
       { signal: controller.signal }
     );
-    return response.choices[0]?.message?.content || '';
+    const choice = response.choices[0];
+    return {
+      content: choice?.message?.content || '',
+      finishReason: choice?.finish_reason || null,
+    };
   } catch (error: unknown) {
     if (error instanceof Error && error.name === 'AbortError') {
       throw new Error('AI 请求超时，请稍后重试');

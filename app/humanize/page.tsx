@@ -1,10 +1,11 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import {
   HumanizeSettings,
   DEFAULT_SETTINGS,
 } from '@/lib/prompts/humanize';
+import { getHumanizeMinimumScriptChars } from '@/lib/script-quality';
 
 // ─── Types ────────────────────────────────────────────────────────
 interface DiagnosisItem {
@@ -88,6 +89,8 @@ interface HumanizeResult {
   riskWarnings?: RiskWarning[];
   nextOptimizationTips?: string[];
   imagePrompts?: ImagePrompt[];
+  qualityWarnings?: string[];
+  retryCount?: number;
   rawText?: string;
   parseFailed?: boolean;
   error?: string;
@@ -217,15 +220,20 @@ export default function HumanizePage() {
   const [finalVersion, setFinalVersion] = useState<Version | null>(null);
   const [error, setError] = useState('');
   const [showHistory, setShowHistory] = useState(false);
-  const [history, setHistory] = useState<HistoryRecord[]>(loadHistory);
+  const [history, setHistory] = useState<HistoryRecord[]>([]);
+
+  // Load history from localStorage after mount to avoid SSR hydration mismatch
+  useEffect(() => {
+    setHistory(loadHistory());
+  }, []);
 
   const hasResult = result !== null;
   const overallRisk = getRiskLevel(result?.riskWarnings);
   const needComplianceOpt = overallRisk === 'medium' || overallRisk === 'high';
   const spokenVersion = result?.mainScript?.spokenVersion || '';
   const wordCount = countWords(spokenVersion);
-  const targetMin = settings.videoDuration === '8-12' ? 2200 : 1200;
-  const wordCountWarn = spokenVersion && wordCount < targetMin;
+  const targetMin = getHumanizeMinimumScriptChars(original, settings.videoDuration);
+  const wordCountWarn = Boolean(spokenVersion && targetMin > 0 && wordCount < targetMin);
 
   // ── Generate ──
   const handleGenerate = useCallback(async () => {
@@ -439,8 +447,8 @@ export default function HumanizePage() {
                 onChange={e => setSettings(s => ({ ...s, videoDuration: e.target.value as '5-8' | '8-12' }))}
                 className="w-full px-2.5 py-1.5 text-sm border border-border rounded-lg bg-surface focus:outline-none focus:border-primary"
               >
-                <option value="5-8">5-8分钟（1500-2200字）</option>
-                <option value="8-12">8-12分钟（2500-3500字）</option>
+                <option value="5-8">5-8分钟（贴近原文字数）</option>
+                <option value="8-12">8-12分钟（可适度扩写）</option>
               </select>
             </div>
 
@@ -786,8 +794,13 @@ export default function HumanizePage() {
             {/* Main Script - Spoken Version */}
             {getDisplayScript() && (
               <Card title="完整口播稿" action={<CopyBtn text={getDisplayScript()} />}>
+                {result.retryCount !== undefined && result.retryCount > 0 && (
+                  <div className="p-2 mb-2 bg-yellow-50 border border-yellow-200 rounded-lg text-xs text-yellow-700">
+                    系统已自动重试 {result.retryCount} 次，当前稿件已通过一整段和素材规则检查。
+                  </div>
+                )}
                 <div className="relative">
-                  <div className="text-sm text-foreground whitespace-pre-wrap leading-8">{getDisplayScript()}</div>
+                  <div className="text-sm text-foreground whitespace-normal leading-8">{getDisplayScript()}</div>
                 </div>
                 <div className="mt-3 flex items-center gap-3 text-xs text-muted">
                   <span>{countWords(getDisplayScript())} 字</span>

@@ -1,10 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { callAI } from '@/lib/claude';
+import { callAIWithMeta } from '@/lib/claude';
 import {
   HUMANIZE_SYSTEM,
   buildHumanizeUserPrompt,
   HumanizeSettings,
 } from '@/lib/prompts/humanize';
+import {
+  getHumanizeMinimumScriptChars,
+  normalizeOneParagraphScript,
+  validateHumanizeResult,
+} from '@/lib/script-quality';
 import { readFileSync } from 'fs';
 import { join } from 'path';
 
@@ -49,7 +54,6 @@ function tryFixTruncatedJson(text: string): string | null {
   // Remove trailing comma after last array/object element
   fixed = fixed.replace(/,\s*$/, '');
   // Count unclosed brackets
-  let opens = 0;
   let inStr = false;
   let esc = false;
   const stack: string[] = [];
@@ -71,6 +75,48 @@ function tryFixTruncatedJson(text: string): string | null {
     fixed += stack.pop();
   }
   return fixed;
+}
+
+function parseAIJson(rawResult: string): Record<string, unknown> | null {
+  let cleaned = rawResult.trim();
+  const mdMatch = cleaned.match(/^```(?:json)?\s*\n?([\s\S]*?)\n?\s*```$/);
+  if (mdMatch) {
+    cleaned = mdMatch[1].trim();
+  }
+
+  cleaned = cleaned.replace(/"((?:[^"\\]|\\.)*)"/g, (_match, inner) => {
+    const fixed = inner
+      .replace(/\r\n/g, '\\n')
+      .replace(/\r/g, '\\n')
+      .replace(/\n/g, '\\n');
+    return `"${fixed}"`;
+  });
+
+  try {
+    return JSON.parse(cleaned) as Record<string, unknown>;
+  } catch {
+    const jsonMatch = extractBalancedJson(cleaned);
+    if (!jsonMatch) return null;
+    try {
+      return JSON.parse(jsonMatch) as Record<string, unknown>;
+    } catch {
+      const fixed = tryFixTruncatedJson(jsonMatch);
+      if (!fixed) return null;
+      try {
+        return JSON.parse(fixed) as Record<string, unknown>;
+      } catch {
+        return null;
+      }
+    }
+  }
+}
+
+function normalizeParsedScript(parsed: Record<string, unknown>): void {
+  if (!parsed.mainScript || typeof parsed.mainScript !== 'object') return;
+  const mainScript = parsed.mainScript as Record<string, unknown>;
+  if (typeof mainScript.spokenVersion === 'string') {
+    mainScript.spokenVersion = normalizeOneParagraphScript(mainScript.spokenVersion);
+  }
 }
 
 function loadComplianceRules(): ComplianceData | null {
@@ -174,7 +220,7 @@ export async function POST(req: NextRequest) {
     const currentMode = mode || 'humanize';
     const preCheck = currentMode === 'humanize' ? preCheckRisks(content, rules) : '';
 
-    const userPrompt = buildHumanizeUserPrompt(
+    const baseUserPrompt = buildHumanizeUserPrompt(
       content,
       effectiveSettings,
       complianceSummary,
@@ -183,75 +229,60 @@ export async function POST(req: NextRequest) {
       body.previousResult
     );
 
-    const rawResult = await callAI(HUMANIZE_SYSTEM, userPrompt, {
-      maxTokens: 8192,
-      timeout: parseInt(process.env.DEEPSEEK_TIMEOUT_MS || '120000', 10),
-    });
+    let parsed: Record<string, unknown> | null = null;
+    let lastFailureReasons: string[] = [];
+    const maxAttempts = currentMode === 'humanize' ? 2 : 1;
 
-    // Try to parse JSON from the result — multi-layer fallback
-    let parsed: Record<string, unknown>;
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      const retryInstruction = lastFailureReasons.length > 0
+        ? `\n\n## 上一次生成未通过系统质量门禁，必须修正\n失败原因：\n${lastFailureReasons.map(reason => `- ${reason}`).join('\n')}\n\n请重新生成完整 JSON。尤其注意：mainScript.spokenVersion 必须是一整段完整口播稿，不能换行，不能出现叔叔/朋友/邻居/我认识的人/我举个例子等身边普通人素材，案例必须来自历史事件、公共时代经验、公开新闻或书中材料。`
+        : '';
 
-    // Step 1: Clean markdown code block wrapping (```json ... ``` or ``` ... ```)
-    let cleaned = rawResult.trim();
-    const mdMatch = cleaned.match(/^```(?:json)?\s*\n?([\s\S]*?)\n?\s*```$/);
-    if (mdMatch) {
-      cleaned = mdMatch[1].trim();
+      const aiResult = await callAIWithMeta(HUMANIZE_SYSTEM, baseUserPrompt + retryInstruction, {
+        maxTokens: 8192,
+        timeout: parseInt(process.env.DEEPSEEK_TIMEOUT_MS || '120000', 10),
+      });
+
+      if (aiResult.finishReason === 'length') {
+        lastFailureReasons = ['AI 输出被长度限制截断，结果不完整'];
+        continue;
+      }
+
+      const candidate = parseAIJson(aiResult.content);
+      if (!candidate) {
+        lastFailureReasons = ['AI 返回内容不是完整合法 JSON'];
+        continue;
+      }
+
+      if (currentMode !== 'humanize') {
+        parsed = candidate;
+        break;
+      }
+
+      normalizeParsedScript(candidate);
+      const quality = validateHumanizeResult(candidate, {
+        minScriptChars: getHumanizeMinimumScriptChars(content, effectiveSettings.videoDuration),
+        requireCompletePackage: true,
+      });
+
+      if (quality.ok) {
+        candidate.qualityWarnings = [];
+        candidate.retryCount = attempt - 1;
+        parsed = candidate;
+        break;
+      }
+
+      lastFailureReasons = quality.reasons;
     }
 
-    // Step 1b: Fix unescaped newlines inside JSON string values
-    // AI often outputs literal newlines inside strings which breaks JSON.parse
-    cleaned = cleaned.replace(/"((?:[^"\\]|\\.)*)"/g, (_match, inner) => {
-      const fixed = inner
-        .replace(/\r\n/g, '\\n')
-        .replace(/\r/g, '\\n')
-        .replace(/\n/g, '\\n');
-      return `"${fixed}"`;
-    });
-
-    try {
-      parsed = JSON.parse(cleaned);
-    } catch {
-      // Step 2: Extract the largest balanced { ... } block
-      const jsonMatch = extractBalancedJson(cleaned);
-      if (jsonMatch) {
-        try {
-          parsed = JSON.parse(jsonMatch);
-        } catch {
-          // Step 3: Try to fix truncated JSON
-          const fixed = tryFixTruncatedJson(jsonMatch);
-          if (fixed) {
-            try {
-              parsed = JSON.parse(fixed);
-            } catch {
-              return NextResponse.json({
-                rawText: rawResult,
-                parseFailed: true,
-                error: '结构化解析失败，但内容已生成',
-              });
-            }
-          } else {
-            return NextResponse.json({
-              rawText: rawResult,
-              parseFailed: true,
-              error: '结构化解析失败，但内容已生成',
-            });
-          }
-        }
-      } else {
-        return NextResponse.json({
-          rawText: rawResult,
-          parseFailed: true,
-          error: '结构化解析失败，但内容已生成',
-        });
-      }
-    }
-
-    // Clean up spokenVersion — remove double newlines so paragraphs are single-line-break separated
-    if (parsed.mainScript) {
-      const ms = parsed.mainScript as Record<string, unknown>;
-      if (typeof ms.spokenVersion === 'string') {
-        ms.spokenVersion = ms.spokenVersion.replace(/\n{2,}/g, '\n').trim();
-      }
+    if (!parsed) {
+      return NextResponse.json(
+        {
+          error: `生成结果不完整，已自动重试仍未通过：${lastFailureReasons.join('；')}`,
+          qualityWarnings: lastFailureReasons,
+        },
+        { status: 502 }
+      );
     }
 
     // Post-check compliance on generated content
