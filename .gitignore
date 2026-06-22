@@ -1,45 +1,84 @@
-# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
-
-# dependencies
+# 依赖
 /node_modules
+/frontend/node_modules
 /.pnp
 .pnp.*
-.yarn/*
-!.yarn/patches
-!.yarn/plugins
-!.yarn/releases
-!.yarn/versions
 
-# testing
-/coverage
-
-# next.js
-/.next/
-/out/
-
-# production
+# 构建产物
 /build
+/out
+/dist
+/frontend/dist
+/.next/
 
-# misc
-.DS_Store
-*.pem
+# 环境变量（含 API 密钥，绝对不提交）
+.env
+.env.*
 
-# debug
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-.pnpm-debug.log*
+# 任务数据（音视频/图片/数据库，体积大且含用户内容）
+data/tasks/
+data/app.db
+data/voices/
+data/samples/
 
-# env files (can opt-in for committing if needed)
-.env*
+# 媒体文件
+*.mp4
+*.mp3
+*.wav
+*.webm
 
-# vercel
-.vercel
+# 日志
+*.log
+*.log.*
 
-# typescript
+# Python 缓存
+__pycache__/
+*.py[cod]
+*.pyo
+.pytest_cache/
+
+# Chrome 调试数据
+.chrome-profile/
+
+# Claude Code 内部文件
+.claude/worktrees/
+.claude/settings.local.json*
+
+# 调试/一次性脚本（根目录调试用）
+redo_*.py
+fix_*.py
+recapture_*.py
+restart_*.py
+click_*.py
+enter_*.py
+enum_*.py
+extract_*.py
+find_*.py
+inspect_*.py
+open_*.py
+print_*.py
+profile_*.py
+back_to_*.py
+audit_*.py
+download_*.py
+
+# 调试截图与临时输出
+_check_frame.png
+_repair_out.txt
+_repair_err.txt
+output/
+
+# 临时/备份文件
+*.bak
+*.bak-*
+*.tmp
+
+# TypeScript
 *.tsbuildinfo
 next-env.d.ts
-cookies/douyin.txt
 
-# claude code worktrees（内部工作目录，不入库）
-.claude/worktrees/
+# 杂项
+.DS_Store
+*.pem
+.vercel
+cookies/douyin.txt
